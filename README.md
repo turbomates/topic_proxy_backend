@@ -11,7 +11,7 @@ Our config.exs would have an entry similar to this:
 # tell logger to load a TopicProxyBackend processes
 config :logger, backends: [
   {TopicProxyBackend, :error_log},
-  {TopicProxyBackend, :warn_console}
+  {TopicProxyBackend, :graylog}
 ]
 
 # configuration for the {TopicProxyBackend, :error_log} backend
@@ -22,13 +22,16 @@ config :logger, :error_log,
     [path: "log/errors.log"]
   }
 
-# configuration for the {TopicProxyBackend, :warn_console} backend
-config :logger, :warn_console,
-  level: :warn,
+# configuration for the {TopicProxyBackend, :graylog} backend
+config :logger, :graylog,
+  level: :info,
   backend: {
-    :console, [
-      format: "$time $metadata[$level] $message\n",
-      metadata: [:request_id, :time, :retry]
+    Logger.Backends.Gelf, [
+      host: "graylog.example.com",
+      port: 12201,
+      application: "MyApplication",
+      compression: :gzip,
+      metadata: [:request_id, :function, :module, :file, :line]
     ]
   }
 ```
@@ -38,6 +41,8 @@ config :logger, :warn_console,
 Use `:topic` in Logger metadata to write message to appropriate log:
 
 ```code
-Logger.warn("Some warning", topic: :warn_console)
+Logger.info("Info", topic: :graylog)
 Logger.error("Error", topic: :error_log)
 ```
+
+Do not use it for `:console` backend.
