@@ -39,5 +39,5 @@ Use `:topic` in Logger metadata to write message to appropriate log:
 
 ```code
 Logger.warn("Some warning", topic: :warn_console)
-Logger.error("Error", topic: :error)
+Logger.error("Error", topic: :error_log)
 ```

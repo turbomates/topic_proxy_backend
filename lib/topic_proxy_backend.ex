@@ -13,14 +13,16 @@ defmodule TopicProxyBackend do
 
   def handle_event({level, _gl, {Logger, _msg, _ts, md}} = event, state) do
     if level?(level, state.level) and topic?(state.name, md[:topic]) do
-      log_event(event, state)
+      {:ok, new_backend_state} = log_event(event, state)
+      {:ok, %{state | backend_state: new_backend_state}}
+    else
+      {:ok, state}
     end
-    {:ok, state}
   end
 
 
-  defp log_event(event, %{proxy: proxy}) do
-    GenEvent.notify(proxy, event)
+  defp log_event(event, %{module: module, backend_state: backend_state}) do
+    module.handle_event(event, backend_state)
   end
 
   defp level?(_, nil),     do: true
@@ -34,24 +36,11 @@ defmodule TopicProxyBackend do
     Application.put_env(:logger, name, opts)
 
     level = Keyword.get(opts, :level)
-    {module, opts} = Keyword.get(opts, :backend)
+    {module, backend_opts} = Keyword.get(opts, :backend)
+    Application.put_env(:logger, :"_proxy_#{name}", backend_opts)
 
-    {:ok, proxy} = configure_backend(module, name, opts)
+    {:ok, backend_state} = module.init({module, :"_proxy_#{name}"})
 
-    %{name: name, level: level, proxy: proxy}
-  end
-
-  defp configure_backend(module, name, opts) do
-    {:ok, proxy} = GenEvent.start_link
-
-    if module == :console do
-      GenEvent.add_handler(proxy, Logger.Backends.Console, :console)
-      unless is_nil(opts), do: GenEvent.call(proxy, Logger.Backends.Console, {:configure, opts})
-    else
-      GenEvent.add_handler(proxy, module, {module, name})
-      unless is_nil(opts), do: GenEvent.call(proxy, module, {:configure, opts})
-    end
-
-    {:ok, proxy}
+    %{name: name, level: level, module: module, backend_state: backend_state}
   end
 end
